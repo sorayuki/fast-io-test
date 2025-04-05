@@ -93,4 +93,5 @@ int main(int, char**){
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endtp - begintp);
     std::cout << "Time taken: " << duration.count() << " ms" << std::endl;
     std::cout << r << std::endl;
+    return 0;
 }
