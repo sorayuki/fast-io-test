@@ -6,4 +6,4 @@ project(fastrd VERSION 0.1.0 LANGUAGES C CXX)
 find_package(Threads REQUIRED)
 
 add_executable(fastrd main.cpp)
-target_link_libraries(fastrd PRIVATE Threads::Threads KtmW32)
+target_link_libraries(fastrd PRIVATE Threads::Threads)

@@ -7,20 +7,13 @@
 #include <future>
 #include <assert.h>
 
-#include <ktmw32.h>
-
 namespace filesystem = std::filesystem;
+using error_code = std::error_code;
 
 struct DeleteDirectoryContext {
-    HANDLE txf_handle{ CreateTransaction({}, {}, {}, {}, {}, {}, {}) };
     std::atomic_bool result{ true };
     std::mutex mutex;
     std::list<std::future<void>> tasks;
-
-    ~DeleteDirectoryContext() {
-        CommitTransaction(txf_handle);
-        CloseHandle(txf_handle);
-    }
 };
 
 void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> parent_deleter, DeleteDirectoryContext& context) {
@@ -29,27 +22,35 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
         auto target = filesystem::path(dir_path);
         // 在所有任务完成之后删除空目录
         auto delete_empty_dir = [parent_deleter, target, &context](int*) {
-            if (filesystem::exists(target)) {
+            error_code ec;
+            if (filesystem::exists(target, ec) && !ec) {
                 assert(filesystem::is_directory(target));
-                //assert(filesystem::is_empty(target));
-                if (RemoveDirectoryTransactedW(target.c_str(), context.txf_handle) == FALSE)
+                assert(filesystem::is_empty(target));
+                if (!filesystem::remove(target, ec) || ec) {
                     context.result = false;
+                }
             }
         };
 
         std::shared_ptr<int> remove_on_destruct(new int{ 0 }, delete_empty_dir);
 
-        // 清空目录下的所有东西 
+        error_code ec;
+        // 清空目录下的所有东西
         std::vector<filesystem::path> files_to_remove;
         std::vector<filesystem::path> dirs_to_remove;
         filesystem::directory_iterator end_iter;
-        for (filesystem::directory_iterator dir_iter(target); dir_iter != end_iter; ++dir_iter) {
-            if (filesystem::is_directory(*dir_iter)) {
+        for (filesystem::directory_iterator dir_iter(target, ec); !ec && dir_iter != end_iter; dir_iter.increment(ec)) {
+            if (filesystem::is_directory(*dir_iter, ec) && !ec) {
                 dirs_to_remove.emplace_back(dir_iter->path());
             }
-            else if (filesystem::is_regular_file(*dir_iter) || filesystem::is_symlink(*dir_iter)) {
+            else if ((filesystem::is_regular_file(*dir_iter, ec) && !ec) || (filesystem::is_symlink(*dir_iter, ec) && !ec)) {
                 files_to_remove.emplace_back(dir_iter->path());
             }
+        }
+
+        if (ec) {
+            context.result = false;
+            return;
         }
 
         // 把当前目录下所有子文件夹的删除任务放入任务队列
@@ -63,16 +64,17 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
             });
             loacl_tasks.emplace_back(std::move(async_task));
         }
-        dirs_to_remove.clear();
         std::unique_lock<std::mutex> lg(context.mutex);
         context.tasks.splice(context.tasks.end(), loacl_tasks);
         lg.unlock();
 
-        // 删除所有文件
+        // 删除所有文件。如果没有子文件夹，那么交给remove_all去删除
         for (auto& file : files_to_remove) {
             assert(filesystem::is_regular_file(file));
-            if (DeleteFileTransactedW(file.c_str(), context.txf_handle) == FALSE)
+            error_code ec;
+            if (!filesystem::remove(file, ec) || ec) {
                 context.result = false;
+            }
         }
     });
 
@@ -95,6 +97,7 @@ bool DeleteDirectoryFast(const std::wstring& dir_path) {
 
     return ctx.result;
 }
+
 
 #include <iostream>
 int wmain(int argc, wchar_t* argv[]){
