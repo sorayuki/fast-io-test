@@ -1,16 +1,26 @@
-﻿#include <filesystem>
+﻿#include <windows.h>
+
+#include <filesystem>
 #include <list>
 #include <mutex>
 #include <vector>
 #include <future>
 #include <assert.h>
 
+#include <ktmw32.h>
+
 namespace filesystem = std::filesystem;
 
 struct DeleteDirectoryContext {
+    HANDLE txf_handle{ CreateTransaction({}, {}, {}, {}, {}, {}, {}) };
     std::atomic_bool result{ true };
     std::mutex mutex;
     std::list<std::future<void>> tasks;
+
+    ~DeleteDirectoryContext() {
+        CommitTransaction(txf_handle);
+        CloseHandle(txf_handle);
+    }
 };
 
 void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> parent_deleter, DeleteDirectoryContext& context) {
@@ -21,8 +31,8 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
         auto delete_empty_dir = [parent_deleter, target, &context](int*) {
             if (filesystem::exists(target)) {
                 assert(filesystem::is_directory(target));
-                assert(filesystem::is_empty(target));
-                if (!filesystem::remove(target))
+                //assert(filesystem::is_empty(target));
+                if (RemoveDirectoryTransactedW(target.c_str(), context.txf_handle) == FALSE)
                     context.result = false;
             }
         };
@@ -49,9 +59,6 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
                 continue;
             
             auto async_task = std::async(std::launch::async | std::launch::deferred, [parent_deleter, remove_on_destruct, dir, &context]() {
-                auto slot = context.thread_id_slot.fetch_add(1);
-                context.thread_ids[slot] = std::this_thread::get_id();
-
                 DeleteDirectoryParallel(dir.generic_wstring(), remove_on_destruct, context);
             });
             loacl_tasks.emplace_back(std::move(async_task));
@@ -64,7 +71,7 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
         // 删除所有文件
         for (auto& file : files_to_remove) {
             assert(filesystem::is_regular_file(file));
-            if (!filesystem::remove(file))
+            if (DeleteFileTransactedW(file.c_str(), context.txf_handle) == FALSE)
                 context.result = false;
         }
     });
