@@ -43,17 +43,22 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
         }
 
         // 把当前目录下所有子文件夹的删除任务放入任务队列
-        std::unique_lock<std::mutex> lg(context.mutex);
+        std::list<std::future<void>> loacl_tasks;
         for (auto& dir : dirs_to_remove) {
             if (dir.filename() == "." || dir.filename() == "..")
                 continue;
+            
+            auto async_task = std::async(std::launch::async | std::launch::deferred, [parent_deleter, remove_on_destruct, dir, &context]() {
+                auto slot = context.thread_id_slot.fetch_add(1);
+                context.thread_ids[slot] = std::this_thread::get_id();
 
-            auto async_task = std::async(std::launch::async, [parent_deleter, remove_on_destruct, dir, &context]() {
                 DeleteDirectoryParallel(dir.generic_wstring(), remove_on_destruct, context);
             });
-            context.tasks.emplace_back(std::move(async_task));
+            loacl_tasks.emplace_back(std::move(async_task));
         }
         dirs_to_remove.clear();
+        std::unique_lock<std::mutex> lg(context.mutex);
+        context.tasks.splice(context.tasks.end(), loacl_tasks);
         lg.unlock();
 
         // 删除所有文件
@@ -85,13 +90,16 @@ bool DeleteDirectoryFast(const std::wstring& dir_path) {
 }
 
 #include <iostream>
-int main(int, char**){
+int wmain(int argc, wchar_t* argv[]){
+    if (argc < 1)
+        return 1;
     using clock = std::chrono::steady_clock;
     auto begintp = clock::now();
-    int r = DeleteDirectoryFast(L"F:\\dev\\boost_1_87_0_11");
+    int r = DeleteDirectoryFast(argv[1]);
     auto endtp = clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endtp - begintp);
     std::cout << "Time taken: " << duration.count() << " ms" << std::endl;
     std::cout << r << std::endl;
+
     return 0;
 }
