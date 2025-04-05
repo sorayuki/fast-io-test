@@ -54,7 +54,7 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
         }
 
         // 把当前目录下所有子文件夹的删除任务放入任务队列
-        std::list<std::future<void>> loacl_tasks;
+        std::list<std::future<void>> local_tasks;
         for (auto& dir : dirs_to_remove) {
             if (dir.filename() == "." || dir.filename() == "..")
                 continue;
@@ -62,10 +62,11 @@ void DeleteDirectoryParallel(const std::wstring& dir_path, std::shared_ptr<int> 
             auto async_task = std::async(std::launch::async | std::launch::deferred, [parent_deleter, remove_on_destruct, dir, &context]() {
                 DeleteDirectoryParallel(dir.generic_wstring(), remove_on_destruct, context);
             });
-            loacl_tasks.emplace_back(std::move(async_task));
+            local_tasks.emplace_back(std::move(async_task));
         }
         std::unique_lock<std::mutex> lg(context.mutex);
-        context.tasks.splice(context.tasks.end(), loacl_tasks);
+        for(auto& local_task: local_tasks)
+            context.tasks.emplace_back(std::move(local_task));
         lg.unlock();
 
         // 删除所有文件。如果没有子文件夹，那么交给remove_all去删除
