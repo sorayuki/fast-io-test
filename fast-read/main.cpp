@@ -1,34 +1,35 @@
+#define _WIN32_WINNT 0x0602
+
 #include <stdint.h>
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <future>
 #include <filesystem>
+#include <stdexcept>
+
 #include <boost/asio.hpp>
 #include <boost/crc.hpp>
+#include <boost/asio/co_spawn.hpp>
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 
+#include <memoryapi.h>
+
 class FastDirCRC {
+protected:
     boost::asio::thread_pool thrpool;
+    int threadcount;
+    boost::asio::io_context ioctx;
     std::atomic_int64_t processed_bytes { 0 };
 
-public:
-    FastDirCRC(int threads) : thrpool(threads) {}
+    virtual void process_file(const std::filesystem::path& path) = 0;
 
     void process_directory_impl(const std::filesystem::path& dir) {
         for (const auto& entry : std::filesystem::directory_iterator(dir)) {
             if (entry.is_regular_file()) {
                 boost::asio::post(thrpool.executor(), [&, entry]() {
-                    boost::interprocess::file_mapping file(entry.path().generic_wstring().c_str(), boost::interprocess::read_only);
-                    boost::interprocess::mapped_region region(file, boost::interprocess::read_only);
-                    auto data = region.get_address();
-                    auto size = region.get_size();
-                    boost::crc_32_type crc;
-                    for(int64_t i = 0; i < size; i += 4096) {
-                        crc.process_byte(((uint8_t*)data)[i]);
-                    }
-                    processed_bytes += size;
-                    std::cout << "Processed file: " << entry.path() << ", CRC: " << crc.checksum() << "\n";
+                    process_file(entry);
                 });
             }
             else if (entry.is_directory()) {
@@ -36,6 +37,9 @@ public:
             }
         }
     }
+
+public:
+    FastDirCRC(int threads) : thrpool(threads), threadcount(threads) {}
 
     void process_directory(const std::filesystem::path& dir) {
         process_directory_impl(dir);
@@ -47,8 +51,97 @@ public:
     }
 };
 
+
+class FastDirCRCFileMapping: public FastDirCRC {
+public:
+    using FastDirCRC::FastDirCRC;
+
+    virtual void process_file(const std::filesystem::path& path) {
+        boost::interprocess::file_mapping file(path.generic_wstring().c_str(), boost::interprocess::read_only);
+        boost::interprocess::mapped_region region(file, boost::interprocess::read_only);
+        auto data = region.get_address();
+        auto size = region.get_size();
+        boost::crc_32_type crc;
+        for(int64_t i = 0; i < size; i += 4096) {
+            crc.process_byte(((uint8_t*)data)[i]);
+        }
+        processed_bytes += size;
+        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+    }
+};
+
+
+class FastDirCRCReadFile: public FastDirCRC {
+public:
+    using FastDirCRC::FastDirCRC;
+
+    virtual void process_file(const std::filesystem::path& path) {
+        boost::asio::random_access_file file(thrpool.get_executor());
+        file.open(path.generic_string().c_str(), boost::asio::random_access_file::read_only);
+        auto size = file.size();
+        boost::crc_32_type crc;
+        std::vector<uint8_t> buffer(4 * 1048576);
+        int64_t offset = 0;
+        while(offset < size) {
+            auto readsize = file.read_some_at(offset, boost::asio::buffer(buffer));
+            for(int64_t i = 0; i < readsize; i += 4096) {
+                crc.process_byte(buffer[i]);
+            }
+            offset += readsize;
+        }
+        processed_bytes += size;
+        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+    }
+};
+
+
+class FastDirCRCSeqReadFile: public FastDirCRC {
+    using FastDirCRC::FastDirCRC;
+
+    boost::asio::thread_pool crcpool {8};
+
+    virtual void process_file(const std::filesystem::path& path) {
+        if (threadcount != 1) {
+            throw std::runtime_error("Thread count must be 1 for sequential read");
+        }
+        boost::asio::random_access_file file(thrpool.get_executor());
+        file.open(path.generic_string().c_str(), boost::asio::random_access_file::read_only);
+        auto size = file.size();
+        boost::crc_32_type crc;
+
+        int blocksize = 64 * 1024;
+
+        int64_t offset = 0;
+        std::future<void> prevfuture;
+        while(offset < size) {
+            std::promise<void> promise;
+            auto nf = promise.get_future();
+            boost::asio::post(crcpool.get_executor(), [&, offset, pf = std::move(prevfuture), p = std::move(promise)]() mutable {
+                auto readsize = size - offset;
+                if (readsize > blocksize)
+                    readsize = blocksize;
+                std::vector<uint8_t> buffer(readsize);
+                boost::asio::read_at(file, offset, boost::asio::buffer(buffer));
+                if (pf.valid())
+                    pf.get();
+                for(int i = 0; i < readsize; i += 4096) {
+                    crc.process_byte(buffer[i]);
+                }
+                p.set_value();
+            });
+            prevfuture = std::move(nf);
+            offset += blocksize;
+        }
+        prevfuture.get();
+        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+        processed_bytes += size;
+    }
+};
+
+
+
 int main(int, char**){
-    FastDirCRC crc(32);
+    FastDirCRCSeqReadFile crc(1);
     std::filesystem::path dir = R"__(D:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\ep1)__";
     auto beign_time = std::chrono::steady_clock::now();
     crc.process_directory(dir);
