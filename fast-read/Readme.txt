@@ -3,7 +3,7 @@ Samsung 990PRO 2T
 D:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\ep1\
 
 ==========
-Memory Mapped File
+Memory Mapped File (map whole file)
 !!! It's not fast without PrefetchVirtualMemory !!!
 
 1 thread, block = 1 GB
@@ -45,6 +45,30 @@ Average speed: 4770.16 MB/s
 Total processed bytes: 26544955408
 Elapsed time: 14664 ms
 Average speed: 1726.35 MB/s
+
+==========
+Memory Mapped File (lazy mapped, call more MapViewOfFile)
+!!! It's not fast without PrefetchVirtualMemory !!!
+
+1 thread, block = 64 MB
+Total processed bytes: 26544955408
+Elapsed time: 4112 ms
+Average speed: 6156.43 MB/s
+
+1 thread, block = 32 MB
+Total processed bytes: 26544955408
+Elapsed time: 4553 ms
+Average speed: 5560.12 MB/s
+
+1 thread, block = 16 MB
+Total processed bytes: 26544955408
+Elapsed time: 6685 ms
+Average speed: 3786.87 MB/s
+
+1 thread, block = 4 MB
+Total processed bytes: 26544955408
+Elapsed time: 9393 ms
+Average speed: 2695.12 MB/s
 
 ==========
 ReadFile 

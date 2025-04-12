@@ -86,6 +86,35 @@ public:
 };
 
 
+class FastDirCRCFileMappingStep: public FastDirCRC {
+    public:
+        virtual void process_file(const std::filesystem::path& path) {
+            boost::interprocess::file_mapping file(path.generic_wstring().c_str(), boost::interprocess::read_only);
+            auto size = std::filesystem::file_size(path);
+            
+            int64_t offset = 0;
+            while(offset < size) {
+                auto cursize = g_blocksize_kb * 1024LL;
+                if (cursize > size - offset)
+                    cursize = size - offset;
+                boost::interprocess::mapped_region region(file, boost::interprocess::read_only, offset, cursize);
+                WIN32_MEMORY_RANGE_ENTRY memrange;
+                memrange.NumberOfBytes = cursize;
+                memrange.VirtualAddress = (uint8_t*)region.get_address();
+                if (PrefetchVirtualMemory(GetCurrentProcess(), 1, &memrange, 0) == FALSE) {
+                    std::cerr << "PrefetchVirtualMemory failed: " << GetLastError() << "\n";
+                }
+                offset += memrange.NumberOfBytes;
+            }
+            boost::crc_32_type crc;
+            // for(int64_t i = 0; i < size; i += 4096) {
+            //     crc.process_byte(((uint8_t*)data)[i]);
+            // }
+            processed_bytes += size;
+            //std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+        }
+};
+
 class FastDirCRCReadFile: public FastDirCRC {
 public:
     virtual void process_file(const std::filesystem::path& path) {
@@ -172,10 +201,14 @@ int main(int argc, char* argv[]){
             break;
         }
         case 1: {
-            dowork(FastDirCRCReadFile{});
+            dowork(FastDirCRCFileMappingStep{});
             break;
         }
         case 2: {
+            dowork(FastDirCRCReadFile{});
+            break;
+        }
+        case 3: {
             dowork(FastDirCRCSeqReadFile{});
             break;
         }
