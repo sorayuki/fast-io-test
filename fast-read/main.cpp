@@ -1,4 +1,4 @@
-#define _WIN32_WINNT 0x0602
+#define _WIN32_WINNT 0x0A00
 
 #include <stdint.h>
 #include <iostream>
@@ -16,10 +16,13 @@
 
 #include <memoryapi.h>
 
+int g_threads = 1;
+int g_infile_threads = 1;
+int g_blocksize_kb = 128;
+
 class FastDirCRC {
 protected:
-    boost::asio::thread_pool thrpool;
-    int threadcount;
+    boost::asio::thread_pool thrpool { (size_t)g_threads };
     boost::asio::io_context ioctx;
     std::atomic_int64_t processed_bytes { 0 };
 
@@ -39,7 +42,7 @@ protected:
     }
 
 public:
-    FastDirCRC(int threads) : thrpool(threads), threadcount(threads) {}
+    FastDirCRC() {}
 
     void process_directory(const std::filesystem::path& dir) {
         process_directory_impl(dir);
@@ -54,54 +57,62 @@ public:
 
 class FastDirCRCFileMapping: public FastDirCRC {
 public:
-    using FastDirCRC::FastDirCRC;
-
     virtual void process_file(const std::filesystem::path& path) {
         boost::interprocess::file_mapping file(path.generic_wstring().c_str(), boost::interprocess::read_only);
         boost::interprocess::mapped_region region(file, boost::interprocess::read_only);
         auto data = region.get_address();
         auto size = region.get_size();
-        boost::crc_32_type crc;
-        for(int64_t i = 0; i < size; i += 4096) {
-            crc.process_byte(((uint8_t*)data)[i]);
+        
+        int64_t offset = 0;
+        while(offset < size) {
+            WIN32_MEMORY_RANGE_ENTRY memrange;
+            memrange.NumberOfBytes = g_blocksize_kb * 1024LL;
+            memrange.VirtualAddress = (uint8_t*)data + offset;
+            if (memrange.NumberOfBytes > size - offset) {
+                memrange.NumberOfBytes = size - offset;
+            }
+            if (PrefetchVirtualMemory(GetCurrentProcess(), 1, &memrange, 0) == FALSE) {
+                std::cerr << "PrefetchVirtualMemory failed: " << GetLastError() << "\n";
+            }
+            offset += memrange.NumberOfBytes;
         }
+        boost::crc_32_type crc;
+        // for(int64_t i = 0; i < size; i += 4096) {
+        //     crc.process_byte(((uint8_t*)data)[i]);
+        // }
         processed_bytes += size;
-        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+        //std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
     }
 };
 
 
 class FastDirCRCReadFile: public FastDirCRC {
 public:
-    using FastDirCRC::FastDirCRC;
-
     virtual void process_file(const std::filesystem::path& path) {
         boost::asio::random_access_file file(thrpool.get_executor());
         file.open(path.generic_string().c_str(), boost::asio::random_access_file::read_only);
         auto size = file.size();
         boost::crc_32_type crc;
-        std::vector<uint8_t> buffer(4 * 1048576);
+        std::vector<uint8_t> buffer(g_blocksize_kb * 1024);
         int64_t offset = 0;
         while(offset < size) {
             auto readsize = file.read_some_at(offset, boost::asio::buffer(buffer));
-            for(int64_t i = 0; i < readsize; i += 4096) {
-                crc.process_byte(buffer[i]);
-            }
+            // for(int64_t i = 0; i < readsize; i += 4096) {
+            //     crc.process_byte(buffer[i]);
+            // }
             offset += readsize;
         }
         processed_bytes += size;
-        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+        //std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
     }
 };
 
 
 class FastDirCRCSeqReadFile: public FastDirCRC {
-    using FastDirCRC::FastDirCRC;
-
-    boost::asio::thread_pool crcpool {8};
+    boost::asio::thread_pool crcpool { (size_t)g_infile_threads };
 
     virtual void process_file(const std::filesystem::path& path) {
-        if (threadcount != 1) {
+        if (g_threads != 1) {
             throw std::runtime_error("Thread count must be 1 for sequential read");
         }
         boost::asio::random_access_file file(thrpool.get_executor());
@@ -109,7 +120,7 @@ class FastDirCRCSeqReadFile: public FastDirCRC {
         auto size = file.size();
         boost::crc_32_type crc;
 
-        int blocksize = 64 * 1024;
+        int blocksize = g_blocksize_kb * 1024;
 
         int64_t offset = 0;
         std::future<void> prevfuture;
@@ -124,31 +135,53 @@ class FastDirCRCSeqReadFile: public FastDirCRC {
                 boost::asio::read_at(file, offset, boost::asio::buffer(buffer));
                 if (pf.valid())
                     pf.get();
-                for(int i = 0; i < readsize; i += 4096) {
-                    crc.process_byte(buffer[i]);
-                }
+                // for(int i = 0; i < readsize; i += 4096) {
+                //     crc.process_byte(buffer[i]);
+                // }
                 p.set_value();
             });
             prevfuture = std::move(nf);
             offset += blocksize;
         }
         prevfuture.get();
-        std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
+        //std::cout << "Processed file: " << path << ", CRC: " << crc.checksum() << "\n";
         processed_bytes += size;
     }
 };
 
+int main(int argc, char* argv[]){
+    int mode = std::stoi(argv[1]);
+    g_threads = std::stoi(argv[2]);
+    g_infile_threads = std::stoi(argv[3]);
+    g_blocksize_kb = std::stoi(argv[4]);
 
-
-int main(int, char**){
-    FastDirCRCSeqReadFile crc(1);
     std::filesystem::path dir = R"__(D:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\ep1)__";
-    auto beign_time = std::chrono::steady_clock::now();
-    crc.process_directory(dir);
-    auto end_time = std::chrono::steady_clock::now();
-    auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - beign_time).count();
-    std::cout << "Total processed bytes: " << crc.get_processed_bytes() << "\n";
-    std::cout << "Elapsed time: " << elapsed_time << " ms\n";
-    std::cout << "Average speed: " << (crc.get_processed_bytes() / (elapsed_time / 1000.0) / (1024 * 1024)) << " MB/s\n";
+    auto dowork = [&](auto crc) {
+        auto beign_time = std::chrono::steady_clock::now();
+        crc.process_directory(dir);
+        auto end_time = std::chrono::steady_clock::now();
+        auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - beign_time).count();
+        std::cout << "Total processed bytes: " << crc.get_processed_bytes() << "\n";
+        std::cout << "Elapsed time: " << elapsed_time << " ms\n";
+        std::cout << "Average speed: " << (crc.get_processed_bytes() / (elapsed_time / 1000.0) / (1024 * 1024)) << " MB/s\n";
+    };
+
+    switch(mode) {
+        case 0: {
+            dowork(FastDirCRCFileMapping{});
+            break;
+        }
+        case 1: {
+            dowork(FastDirCRCReadFile{});
+            break;
+        }
+        case 2: {
+            dowork(FastDirCRCSeqReadFile{});
+            break;
+        }
+        default:
+            ;
+    }
+
     return 0;
 }

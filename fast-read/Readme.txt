@@ -4,83 +4,100 @@ D:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\ep1\
 
 ==========
 Memory Mapped File
+!!! It's not fast without PrefetchVirtualMemory !!!
 
-1 thread
+1 thread, block = 1 GB
 Total processed bytes: 26544955408
-Elapsed time: 23717 ms
-Average speed: 1067.39 MB/s
+Elapsed time: 3958 ms
+Average speed: 6395.97 MB/s
 
-32 thread
+1 thread, block = 32 MB
 Total processed bytes: 26544955408
-Elapsed time: 11589 ms
-Average speed: 2184.42 MB/s
+Elapsed time: 4018 ms
+Average speed: 6300.46 MB/s
+
+1 thread, block = 16 MB
+Total processed bytes: 26544955408
+Elapsed time: 4168 ms
+Average speed: 6073.71 MB/s
+
+1 thread, block = 12 MB
+Total processed bytes: 26544955408
+Elapsed time: 4351 ms
+Average speed: 5818.26 MB/s
+
+1 thread, block = 10 MB
+Total processed bytes: 26544955408
+Elapsed time: 4445 ms
+Average speed: 5695.22 MB/s
+
+1 thread, block = 8 MB
+Total processed bytes: 26544955408
+Elapsed time: 4880 ms
+Average speed: 5187.55 MB/s
+
+1 thread, block = 4 MB
+Total processed bytes: 26544955408
+Elapsed time: 5307 ms
+Average speed: 4770.16 MB/s
+
+1 thread, block = 1 MB
+Total processed bytes: 26544955408
+Elapsed time: 14664 ms
+Average speed: 1726.35 MB/s
 
 ==========
 ReadFile 
 
-1 thread
+1 thread, block = 1 MB
 Total processed bytes: 26544955408
-Elapsed time: 15193 ms
-Average speed: 1666.24 MB/s
+Elapsed time: 22603 ms
+Average speed: 1119.99 MB/s
 
-32 thread (parallel in different files)
+32 thread, block = 1 MB
 Total processed bytes: 26544955408
-Elapsed time: 7839 ms
-Average speed: 3229.4 MB/s
-
+Elapsed time: 12840 ms
+Average speed: 1971.59 MB/s
 
 ==========
-ReadFile 8 thread, pipeline in same file
+ReadFile 1 thread, pipeline in same file
 
-block size 1024 KB
+pipeline = 8 threads, block = 1 MB
 Total processed bytes: 26544955408
-Elapsed time: 10334 ms
-Average speed: 2449.7 MB/s
+Elapsed time: 11420 ms
+Average speed: 2216.75 MB/s
 
-block size 512 KB
+pipeline = 8 threads, block = 512 KB
 Total processed bytes: 26544955408
-Elapsed time: 9350 ms
-Average speed: 2707.51 MB/s
+Elapsed time: 9388 ms
+Average speed: 2696.55 MB/s
 
-block size 256 KB
+pipeline = 8 threads, block = 256 KB
 Total processed bytes: 26544955408
-Elapsed time: 9026 ms
-Average speed: 2804.7 MB/s
+Elapsed time: 9188 ms
+Average speed: 2755.25 MB/s
 
-block size 128 KB
+pipeline = 8 threads, block = 128 KB
 Total processed bytes: 26544955408
-Elapsed time: 8935 ms
-Average speed: 2833.27 MB/s
+Elapsed time: 8862 ms
+Average speed: 2856.61 MB/s
 
-block size 64 KB
+pipeline = 8 threads, block = 64 KB
 Total processed bytes: 26544955408
-Elapsed time: 9235 ms
-Average speed: 2741.23 MB/s
+Elapsed time: 9322 ms
+Average speed: 2715.64 MB/s
 
-==========
-ReadFile 32 thread, pipeline in same file
-
-block size 1024 KB
+pipeline = 16 threads, block = 128 KB
 Total processed bytes: 26544955408
-Elapsed time: 6571 ms
-Average speed: 3852.57 MB/s
+Elapsed time: 5938 ms
+Average speed: 4263.26 MB/s
 
-block size 512 KB
+pipeline = 24 threads, block = 128 KB
+Total processed bytes: 26544955408
+Elapsed time: 5578 ms
+Average speed: 4538.41 MB/s
+
+pipeline = 32 threads, block = 128 KB
 Total processed bytes: 26544955408
 Elapsed time: 5670 ms
 Average speed: 4464.77 MB/s
-
-block size 256 KB
-Total processed bytes: 26544955408
-Elapsed time: 5519 ms
-Average speed: 4586.93 MB/s
-
-block size 128 KB
-Total processed bytes: 26544955408
-Elapsed time: 5552 ms
-Average speed: 4559.66 MB/s
-
-block size 64 KB
-Total processed bytes: 26544955408
-Elapsed time: 6204 ms
-Average speed: 4080.47 MB/s
