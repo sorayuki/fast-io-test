@@ -2,126 +2,112 @@ Samsung 990PRO 2T
 
 D:\SteamLibrary\steamapps\common\Cyberpunk 2077\archive\pc\ep1\
 
+Total bytes: 26,544,955,408
+
 ==========
 Memory Mapped File (map whole file)
 !!! It's not fast without PrefetchVirtualMemory !!!
 
-1 thread, block = 1 GB
-Total processed bytes: 26544955408
-Elapsed time: 3958 ms
-Average speed: 6395.97 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1483.46 2164.99 4137.15 6059.18 6249.13
+2       1562.57 3199.2  5991.77 6514.47 6583.94
+4       1734.63 3170.75 5687.54 6448.1  6514.47
+8       1688.7  3352.57 5561.34 6464.57 6548.17
+threads
 
-1 thread, block = 32 MB
-Total processed bytes: 26544955408
-Elapsed time: 4018 ms
-Average speed: 6300.46 MB/s
-
-1 thread, block = 16 MB
-Total processed bytes: 26544955408
-Elapsed time: 4168 ms
-Average speed: 6073.71 MB/s
-
-1 thread, block = 12 MB
-Total processed bytes: 26544955408
-Elapsed time: 4351 ms
-Average speed: 5818.26 MB/s
-
-1 thread, block = 10 MB
-Total processed bytes: 26544955408
-Elapsed time: 4445 ms
-Average speed: 5695.22 MB/s
-
-1 thread, block = 8 MB
-Total processed bytes: 26544955408
-Elapsed time: 4880 ms
-Average speed: 5187.55 MB/s
-
-1 thread, block = 4 MB
-Total processed bytes: 26544955408
-Elapsed time: 5307 ms
-Average speed: 4770.16 MB/s
-
-1 thread, block = 1 MB
-Total processed bytes: 26544955408
-Elapsed time: 14664 ms
-Average speed: 1726.35 MB/s
+with CRC compute every 4K bytes
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1462.04 1817.06 3023.8  3763.23 2808.12
+2       2525.72 4162.32 4919.4  4934.75 4701.94
+4       2539.91 3394.83 3845.55 4894.67 4398.83
+8       2600.97 4011.29 3888.67 4883.34 4344.47
+threads
 
 ==========
 Memory Mapped File (lazy mapped, call more MapViewOfFile)
 !!! It's not fast without PrefetchVirtualMemory !!!
 
-1 thread, block = 64 MB
-Total processed bytes: 26544955408
-Elapsed time: 4112 ms
-Average speed: 6156.43 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1583.39 1837.1  4729.17 5921.69 6113.32
+2       1521.71 3106.16 6046.15 6516.15 6580.52
+4       1701.29 3351.24 5736.52 6434.99 6529.6
+8       1666.68 3086.85 5638.14 6402.44 6524.55
+threads
 
-1 thread, block = 32 MB
-Total processed bytes: 26544955408
-Elapsed time: 4553 ms
-Average speed: 5560.12 MB/s
-
-1 thread, block = 16 MB
-Total processed bytes: 26544955408
-Elapsed time: 6685 ms
-Average speed: 3786.87 MB/s
-
-1 thread, block = 4 MB
-Total processed bytes: 26544955408
-Elapsed time: 9393 ms
-Average speed: 2695.12 MB/s
+with CRC compute every 4K bytes
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1499.9  1851.34 2560.98 3562.02 3017.31
+2       2539.14 4245.39 4458.48 5122.47 4927.06
+4       2797.26 4446.73 4234.03 5063.05 4798.19
+8       2496.33 4024.04 3737.12 4740.68 4626.32
+threads
 
 ==========
-ReadFile 
+Memory Mapped File (lazy mapped, not use PrefetchVirtualMemory)
 
-1 thread, block = 1 MB
-Total processed bytes: 26544955408
-Elapsed time: 22603 ms
-Average speed: 1119.99 MB/s
-
-32 thread, block = 1 MB
-Total processed bytes: 26544955408
-Elapsed time: 12840 ms
-Average speed: 1971.59 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       468.731 672.956 1034.58 1143.42 1221.01
+2       580.186 1072.5  1653.51 2000.26 2082.02
+4       650.861 1164.29 1964.86 2161.29 2293.67
+8       608.496 1115.11 1808.36 2178.4  2262.71
+threads
 
 ==========
-ReadFile 1 thread, pipeline in same file
+ReadFile with sequence scan hint
 
-pipeline = 8 threads, block = 1 MB
-Total processed bytes: 26544955408
-Elapsed time: 11420 ms
-Average speed: 2216.75 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1402.27 1962.27 2643.61 4059.53 3471.17
+2       2654.15 4518.16 5383.93 5421.98 5319.45
+4       2843.77 4414.94 4295.09 5163.21 5016.89
+8       2533.3  3636.2  4300.19 5104.91 5013.91
+threads
 
-pipeline = 8 threads, block = 512 KB
-Total processed bytes: 26544955408
-Elapsed time: 9388 ms
-Average speed: 2696.55 MB/s
+with CRC compute every 4K bytes
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1499.9  1900.69 2590.06 3339.74 2676.6
+2       2580.29 4378.28 4901.31 4971.57 4464.77
+4       2800.05 4326.65 4025.96 4959.88 4581.94
+8       2681.7  4086.4  4251.8  4655.25 4317.06
+threads
 
-pipeline = 8 threads, block = 256 KB
-Total processed bytes: 26544955408
-Elapsed time: 9188 ms
-Average speed: 2755.25 MB/s
+==========
+ReadFile, use overlapped (specify byte range each reading)
 
-pipeline = 8 threads, block = 128 KB
-Total processed bytes: 26544955408
-Elapsed time: 8862 ms
-Average speed: 2856.61 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       611.435 1126.67 1683.08 1911.74 2212.1
+2       1102.77 2168.14 3421.44 3818.86 3744.86
+4       1184.23 2046.5  3366.39 3501.9  3680.61
+8       1251.62 2000.57 3222.82 3354.35 3611.3
+threads
 
-pipeline = 8 threads, block = 64 KB
-Total processed bytes: 26544955408
-Elapsed time: 9322 ms
-Average speed: 2715.64 MB/s
+with CRC compute every 4K bytes
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1454.31 1959.54 2636.46 3734.36 2854.03
+2       2556.32 4267.57 4778.26 4990.19 4553.92
+4       2796.96 3454.59 4187.11 4873    4443.61
+8       2751.06 3310.05 3967.28 4793.65 4245.39
+threads
 
-pipeline = 16 threads, block = 128 KB
-Total processed bytes: 26544955408
-Elapsed time: 5938 ms
-Average speed: 4263.26 MB/s
+==========
+fopen + fread
 
-pipeline = 24 threads, block = 128 KB
-Total processed bytes: 26544955408
-Elapsed time: 5578 ms
-Average speed: 4538.41 MB/s
+without CRC compute
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1414.02 1789.57 2618.73 3974.14 3383.94
+2       2522.44 4484.54 4782.78 5340.77 5318.33
+4       2616.83 3815.98 4311.91 5186.49 5070.15
+8       2550.91 3330.08 4232.61 5159.01 5045.89
+threads
 
-pipeline = 32 threads, block = 128 KB
-Total processed bytes: 26544955408
-Elapsed time: 5670 ms
-Average speed: 4464.77 MB/s
+with CRC compute every 4K bytes
+MBps    256     1024    4096    16384   32768   blocksize(KB)
+1       1471.82 1877.15 2668.98 3743.2  3103.5
+2       2602.04 4410.32 5068.12 5200.34 4926.1
+4       2897.48 3345.48 4352.69 5062.04 4803.65
+8       2740.63 3319.16 4293.63 5060.01 4539.22
+threads
