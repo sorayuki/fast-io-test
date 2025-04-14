@@ -1,7 +1,7 @@
 Set-Location .\build\Release
 $blocksizes = (256, 1024, 4096, 16384, 32768)
 
-foreach($mode in (0, 1, 2, 3, 4)) {
+foreach($mode in (0, 1, 2, 3, 4, 5)) {
     Write-Host "======== mode $mode ========"
     Write-Host -NoNewline "MBps"
     foreach ($blocksize in $blocksizes) {
